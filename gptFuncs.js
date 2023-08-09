@@ -1,17 +1,15 @@
-const {OpenAIApi} = require('openai');
+// Description: Functions for interacting with OpenAI's GPT-3.5 API
+async function getChatCompletion(prompt,openAiInstance) {
 
-const openai = new OpenAIApi({
-  api_key: 'YOUR-API-KEY-HERE'
-});
-
-async function getChatCompletion(prompt) {
-  const response = await openai.createChatCompletion({
+  const response = await openAiInstance.createChatCompletion({
     model: 'gpt-3.5-turbo',
     messages: [
+      {role: "system", content: "Assume the role of a professional copywriter. Follow the provided instructions and outline to crate a high-quality and engaging article."},
       { role: 'user', content: prompt }
     ]
   });
-  return response.data;
+  const textResponse = response.data.choices[0].message.content;
+  return {text: textResponse}
 }
 
 module.exports = getChatCompletion;

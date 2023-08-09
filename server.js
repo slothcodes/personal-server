@@ -1,8 +1,18 @@
+require('dotenv').config();
 const express = require('express');
 const getChatCompletion = require('./gptFuncs.js');
+const { Configuration, OpenAIApi } = require("openai");
 const app = express();
 const path = require('path');
 const port = 5001;
+
+// set up openai api access
+const openAiKey = process.env.OPENAI_API_KEY; 
+const configuration = new Configuration({ apiKey: openAiKey });
+const openAiInstance = new OpenAIApi(configuration);
+
+// use json for post requests
+app.use(express.json());
 
 // server static react files
 app.use(express.static(path.join(__dirname, 'dist')));
@@ -15,10 +25,8 @@ app.get('/', (req, res) => {
 
 // handle post requests
 app.post('/getCompletion', async (req, res) => {
-    console.log(req.body);
-    const prompt = req.body;
-    const response = await getChatCompletion(prompt);
-    console.log(response);
+    const prompt = req.body.text;
+    const response = await getChatCompletion(prompt,openAiInstance);
     res.send(response);
     }
 );
