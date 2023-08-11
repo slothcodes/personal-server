@@ -25,9 +25,11 @@ app.get('/', (req, res) => {
 
 // handle post requests
 app.post('/getCompletion', async (req, res) => {
-    const prompt = req.body.text;
+
+    const prompt = req.body;
     const response = await getChatCompletion(prompt,openAiInstance);
-    res.send(response);
+    console.log('outgoing response',response)
+    res.json(response);
     }
 );
 
