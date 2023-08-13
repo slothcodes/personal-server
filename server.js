@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const getChatCompletion = require('./gptFuncs.js');
+const {getChatCompletion, getArticle} = require('./gptFuncs.js');
 const { Configuration, OpenAIApi } = require("openai");
 const app = express();
 const path = require('path');
@@ -29,6 +29,14 @@ app.post('/getCompletion', async (req, res) => {
     const prompt = req.body;
     const response = await getChatCompletion(prompt,openAiInstance);
     console.log('outgoing response',response)
+    res.json(response);
+    }
+);
+
+app.post('/getArticle', async (req, res) => {
+    const prompt = req.body;
+    const response = await getArticle(prompt,openAiInstance);
+    //console.log('outgoing response',response)
     res.json(response);
     }
 );

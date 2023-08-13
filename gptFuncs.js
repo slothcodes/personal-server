@@ -1,6 +1,8 @@
+
 // Description: Functions for interacting with OpenAI's GPT-3.5 API
 async function getChatCompletion(promptReq,openAiInstance) {
   // Validation for promptReq.text
+  console.log('incoming prompt',promptReq)
   if (!promptReq.promptText || typeof promptReq.promptText !== 'string') {
       return({list: ['Invalid prompt']});
   }
@@ -27,6 +29,19 @@ async function getChatCompletion(promptReq,openAiInstance) {
   }
 }
 
+async function getArticle(prompt,openAiInstance) {
+  context = [{role: "system", content: "You will be given a keyword, sentence or phrase, you will need to return an article that follows the outline."}]
+  context.push({ role: 'user', content: prompt.promptText })
+  const response = await openAiInstance.createChatCompletion({
+    model: 'gpt-3.5-turbo',
+    messages: context,
+    max_tokens: 100
+  });
+  const textResponse = await response.data.choices[0].message.content;
+  console.log('articleResponse',textResponse)
+  return {article: textResponse}
+}
+
 async function getSubheadingCompletion(prompt,context,openAiInstance) {
   context.push({ role: 'user', content: prompt.promptText })
   const response = await openAiInstance.createChatCompletion({
@@ -37,4 +52,7 @@ async function getSubheadingCompletion(prompt,context,openAiInstance) {
     return {list: subheadingList}
   }
 
-module.exports = getChatCompletion;
+module.exports = {
+  getChatCompletion,
+  getArticle
+}
