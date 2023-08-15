@@ -38,7 +38,6 @@ async function getArticle(prompt,openAiInstance) {
     max_tokens: 100
   });
   const textResponse = await response.data.choices[0].message.content;
-  console.log('articleResponse',textResponse)
   return {article: textResponse}
 }
 

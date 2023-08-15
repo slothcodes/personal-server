@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
-const {getChatCompletion, getArticle} = require('./gptFuncs.js');
 const { Configuration, OpenAIApi } = require("openai");
+const {getChatCompletion, getArticle} = require('./gptFuncs.js');
+const rateLimiter = require('express-rate-limit')
 const app = express();
 const path = require('path');
 const port = 5001;
@@ -10,6 +11,23 @@ const port = 5001;
 const openAiKey = process.env.OPENAI_API_KEY; 
 const configuration = new Configuration({ apiKey: openAiKey });
 const openAiInstance = new OpenAIApi(configuration);
+
+// set up api rate limiter
+const apiLimiter = rateLimiter({
+    windowMs: 60 * 1000, // 1 minute
+    max: 2 // limit each IP to 10 requests per windowMs
+    }
+);
+
+// set up main rate limiter
+const mainLimiter = rateLimiter({
+    windowMs: 60 * 1000, // 1 minute
+    max: 2 // limit each IP to 10 requests per windowMs
+});
+
+// use rate limiters on routes
+app.use('/api/',apiLimiter);
+app.use('/',mainLimiter);
 
 // use json for post requests
 app.use(express.json());
@@ -24,19 +42,16 @@ app.get('/', (req, res) => {
 );
 
 // handle post requests
-app.post('/getCompletion', async (req, res) => {
-
+app.post('/api/getCompletion', async (req, res) => {
+    console.log('incoming request',req.body)
     const prompt = req.body;
     const response = await getChatCompletion(prompt,openAiInstance);
-    console.log('outgoing response',response)
     res.json(response);
     }
-);
-
-app.post('/getArticle', async (req, res) => {
+);// submit outline to gpt-3.5 to generate article
+app.post('/api/getArticle', async (req, res) => {
     const prompt = req.body;
     const response = await getArticle(prompt,openAiInstance);
-    //console.log('outgoing response',response)
     res.json(response);
     }
 );
