@@ -30,30 +30,52 @@ async function getChatCompletion(promptReq,openAiInstance) {
 }
 
 // pass prompt through openAI safety filters
+async function checkContentSafety(promptReq,openAiInstance) {
+  try {
+    const response = await openAiInstance.createContentFilter({
+      prompt: promptReq.promptText,
+      labels: ['safe', 'unsafe'],
+      query: 'safe'
+    });
+    return response.data.label;   
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+
 
 // submits outline to gpt-3.5 to generate article
 async function getArticle(prompt,openAiInstance) {
-  context = [{role: "system", content: "You will be given a keyword, sentence or phrase, you will need to return an article that follows the outline."}]
-  context.push({ role: 'user', content: prompt.promptText })
-  const response = await openAiInstance.createChatCompletion({
-    model: 'gpt-3.5-turbo',
-    messages: context,
-    max_tokens: 100
-  });
-  const textResponse = await response.data.choices[0].message.content;
-  // Convert Article Response To List To Standardize Responses And Make It Easier To Add More Article Responses In The Future
-  return {response: [textResponse]}
+  if (checkContentSafety(prompt,openAiInstance) === 'safe') {
+    context = [{role: "system", content: "You will be given a keyword, sentence or phrase, you will need to return an article that follows the outline."}]
+    context.push({ role: 'user', content: prompt.promptText })
+    const response = await openAiInstance.createChatCompletion({
+      model: 'gpt-3.5-turbo',
+      messages: context,
+      max_tokens: 100
+    });
+    const textResponse = await response.data.choices[0].message.content;
+    // Convert Article Response To List To Standardize Responses And Make It Easier To Add More Article Responses In The Future
+    return {response: [textResponse]}
+  } else {
+    return {response: ['Content Moderation Fail. Please Try Again']}
+  }
 }
 
 async function getSubheadingCompletion(prompt,context,openAiInstance) {
-  context.push({ role: 'user', content: prompt.promptText })
-  const response = await openAiInstance.createChatCompletion({
-    model: 'gpt-3.5-turbo',
-    messages: context});
-    const textResponse = await response.data.choices[0].message.content;
-    const subheadingList = textResponse.split('subheading:');
-    return {response: subheadingList}
+  if (checkContentSafety(prompt,openAiInstance) === 'safe') {
+    context.push({ role: 'user', content: prompt.promptText })
+    const response = await openAiInstance.createChatCompletion({
+      model: 'gpt-3.5-turbo',
+      messages: context});
+      const textResponse = await response.data.choices[0].message.content;
+      const subheadingList = textResponse.split('subheading:');
+      return {response: subheadingList}
+  } else {
+    return {response: ['Content Moderation Fail. Please Try Again']}
   }
+}
 
 module.exports = {
   getChatCompletion,
