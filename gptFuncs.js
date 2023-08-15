@@ -30,16 +30,18 @@ async function getChatCompletion(promptReq,openAiInstance) {
 }
 
 // pass prompt through openAI safety filters
-async function checkContentSafety(promptReq,openAiInstance) {
-  try {
-    const response = await openAiInstance.createContentFilter({
-      prompt: promptReq.promptText,
-      labels: ['safe', 'unsafe'],
-      query: 'safe'
-    });
-    return response.data.label;   
-  } catch (err) {
-    console.log(err);
+async function checkContentSafety(promptReq, openAiInstance) {
+  const response = await openAiInstance.createModeration({
+    input: promptReq.promptText,
+  })
+  const moderationResponse = await response.data;
+  console.log('textResponse',moderationResponse.results[0].flagged)
+  if (moderationResponse.results[0].flagged === false) {
+    console.log('returning safe')
+    return 'safe'
+  }
+  else {
+    return 'unsafe'
   }
 }
 
@@ -47,7 +49,8 @@ async function checkContentSafety(promptReq,openAiInstance) {
 
 // submits outline to gpt-3.5 to generate article
 async function getArticle(prompt,openAiInstance) {
-  if (checkContentSafety(prompt,openAiInstance) === 'safe') {
+  const modResults = await checkContentSafety(prompt,openAiInstance)
+  if (modResults === 'safe') {
     context = [{role: "system", content: "You will be given a keyword, sentence or phrase, you will need to return an article that follows the outline."}]
     context.push({ role: 'user', content: prompt.promptText })
     const response = await openAiInstance.createChatCompletion({
@@ -64,7 +67,8 @@ async function getArticle(prompt,openAiInstance) {
 }
 
 async function getSubheadingCompletion(prompt,context,openAiInstance) {
-  if (checkContentSafety(prompt,openAiInstance) === 'safe') {
+  const modResults = await checkContentSafety(prompt,openAiInstance)
+  if (modResults === 'safe') {
     context.push({ role: 'user', content: prompt.promptText })
     const response = await openAiInstance.createChatCompletion({
       model: 'gpt-3.5-turbo',
