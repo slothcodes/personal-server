@@ -3,6 +3,7 @@ const express = require('express');
 const { Configuration, OpenAIApi } = require("openai");
 const {getChatCompletion, getArticle} = require('./gptFuncs.js');
 const rateLimiter = require('express-rate-limit')
+const {dbCycle} = require('./dbFuncs.js');
 const app = express();
 const path = require('path');
 const port = 5001;
@@ -15,7 +16,8 @@ const openAiInstance = new OpenAIApi(configuration);
 // set up api rate limiter
 const apiLimiter = rateLimiter({
     windowMs: 60 * 1000, // 1 minute
-    max: 2 // limit each IP to 10 requests per windowMs
+    max: 2, // limit each IP to 10 requests per windowMs
+    message: {response: ['Too many requests from this IP, please try again in a few minutes']}
     }
 );
 
@@ -43,18 +45,29 @@ app.get('/', (req, res) => {
 
 // handle post requests
 app.post('/api/getCompletion', async (req, res) => {
-    console.log('incoming request',req.body)
-    const prompt = req.body;
-    const response = await getChatCompletion(prompt,openAiInstance);
-    res.json(response);
+    // run dbCycle to check for daily api calls and update database
+    if (dbCycle()) {
+        console.log('incoming request',req.body)
+        const prompt = req.body;
+        const response = await getChatCompletion(prompt,openAiInstance);
+        res.json(response);
+    } else {
+        console.log('Daily Global Request Limit Reached. Try Again Tomorrow.')
     }
-);// submit outline to gpt-3.5 to generate article
+});
+
+// submit outline to gpt-3.5 to generate article
 app.post('/api/getArticle', async (req, res) => {
-    const prompt = req.body;
-    const response = await getArticle(prompt,openAiInstance);
-    res.json(response);
+    // run dbCycle to check for daily api calls and update database
+    if (dbCycle()) {
+        console.log('incoming request',req.body)
+        const prompt = req.body;
+        const response = await getArticle(prompt,openAiInstance);
+        res.json(response);
+    } else {
+        console.log('Daily Global Request Limit Reached. Try Again Tomorrow.')
     }
-);
+});
 
 // start server
 app.listen(port, () => {

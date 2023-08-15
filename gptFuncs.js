@@ -29,6 +29,9 @@ async function getChatCompletion(promptReq,openAiInstance) {
   }
 }
 
+// pass prompt through openAI safety filters
+
+// submits outline to gpt-3.5 to generate article
 async function getArticle(prompt,openAiInstance) {
   context = [{role: "system", content: "You will be given a keyword, sentence or phrase, you will need to return an article that follows the outline."}]
   context.push({ role: 'user', content: prompt.promptText })
@@ -38,7 +41,8 @@ async function getArticle(prompt,openAiInstance) {
     max_tokens: 100
   });
   const textResponse = await response.data.choices[0].message.content;
-  return {article: textResponse}
+  // Convert Article Response To List To Standardize Responses And Make It Easier To Add More Article Responses In The Future
+  return {response: [textResponse]}
 }
 
 async function getSubheadingCompletion(prompt,context,openAiInstance) {
@@ -48,7 +52,7 @@ async function getSubheadingCompletion(prompt,context,openAiInstance) {
     messages: context});
     const textResponse = await response.data.choices[0].message.content;
     const subheadingList = textResponse.split('subheading:');
-    return {list: subheadingList}
+    return {response: subheadingList}
   }
 
 module.exports = {
