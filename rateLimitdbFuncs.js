@@ -1,21 +1,7 @@
 require('dotenv').config();
 const mysql = require('mysql2');
 
-// Set up MySQL connection
-const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: process.env.DB_PASS,
-    database: 'portfolioDB'
-});
-
-// Connect to MySQL
-connection.connect((err) => {
-    if (err) throw err;
-    console.log('Connected to MySQL database');
-});
-
-function queryAsync(sql, args) {
+function queryAsync(sql, args, connection) {
     return new Promise((resolve, reject) => {
         connection.query(sql, args, (err, result) => {
             if (err) {
@@ -27,26 +13,26 @@ function queryAsync(sql, args) {
 }
 
 // Update date
-async function updateDB() {
+async function updateRateLimitDB(connection) {
     console.log('updating db');
     const date = new Date().toISOString().slice(0, 10);
-    const res = await queryAsync('SELECT * FROM dailyCalls WHERE date = ?', [date]);
+    const res = await queryAsync('SELECT * FROM dailyCalls WHERE date = ?', [date],connection);
     
     if (res.length === 0) {
-        await queryAsync('INSERT INTO dailyCalls (date, totals) VALUES (?, ?)', [date, 1]);
+        await queryAsync('INSERT INTO dailyCalls (date, totals) VALUES (?, ?)', [date, 1],connection);
         console.log('Initialized count for the current date.');
     } else {
-        await queryAsync('UPDATE dailyCalls SET totals = totals + 1 WHERE date = ?', [date]);
+        await queryAsync('UPDATE dailyCalls SET totals = totals + 1 WHERE date = ?', [date],connection);
         console.log('Incremented count for the current date.');
     }
 }
 
 // Check whether current day's apiCalls is less than 200
-async function checkApiCalls() {
+async function checkApiCalls(connection) {
     const date = new Date().toISOString().slice(0, 10);
     console.log('date', date);
     
-    const res = await queryAsync('SELECT * FROM dailyCalls WHERE date = ?', [date]);
+    const res = await queryAsync('SELECT * FROM dailyCalls WHERE date = ?', [date],connection);
     console.log('res', res);
     
     if (res.length === 0) {
@@ -59,15 +45,15 @@ async function checkApiCalls() {
 }
 
 // DB cycle function
-async function dbCycle() {
+async function rateLimitDBCycle(connection) {
     console.log('checking api calls');
     
     try {
-        const hasApiCallsLeft = await checkApiCalls();
+        const hasApiCallsLeft = await checkApiCalls(connection);
         console.log('Has API Calls Left:', hasApiCallsLeft);
         
         if (hasApiCallsLeft) {
-            await updateDB();
+            await updateRateLimitDB(connection);
             return true;
         } else {
             return false;
@@ -78,5 +64,5 @@ async function dbCycle() {
 }
 
 module.exports = {
-    dbCycle
+    rateLimitDBCycle
 }
