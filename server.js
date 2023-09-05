@@ -5,7 +5,7 @@ const {getChatCompletion, getArticle} = require('./gptFuncs.js');
 const mysql = require('mysql2');
 const rateLimiter = require('express-rate-limit')
 const {rateLimitDBCycle} = require('./rateLimitdbFuncs.js');
-const {updateNewsDB} = require('./newsDBFuncs.js');
+const {updateNewsDB, getAllStories} = require('./newsDBFuncs.js');
 const app = express();
 const path = require('path');
 const port = 5001;
@@ -18,7 +18,7 @@ const openAiInstance = new OpenAIApi(configuration);
 // set up api rate limiter
 const apiLimiter = rateLimiter({
     windowMs: 60 * 1000, // 1 minute
-    max: 2, // limit each IP to 10 requests per windowMs
+    max: 20, // limit each IP to 10 requests per windowMs
     message: {response: ['Too many requests from this IP, please try again in a few minutes']}
     }
 );
@@ -26,26 +26,52 @@ const apiLimiter = rateLimiter({
 // set up main rate limiter
 const mainLimiter = rateLimiter({
     windowMs: 60 * 1000, // 1 minute
-    max: 2 // limit each IP to 10 requests per windowMs
+    max: 100, 
+    message: {response: ['Too many requests from this IP, please try again in a few minutes']}
+
 });
 
-// Set up MySQL connection
-const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: process.env.DB_PASS,
-    database: 'portfolioDB'
-});
+function handleConnections() {
+    const connection = mysql.createConnection({
+        host: 'localhost',
+        user: 'root',
+        password: process.env.DB_PASS,
+        database: 'portfolioDB'
+    });
 
-// Connect to MySQL
-connection.connect((err) => {
-    if (err) throw err;
-    console.log('Connected to MySQL database');
-});
+    connection.connect((err) => {
+        if (err) {
+            console.error('Error connecting to database:', err);
+            setTimeout(handleDisconnect, 5000);
+            return;
+        }
+        console.log('Connected to MySQL database');
+    });
+
+    connection.on('error', (err) => {
+        console.error('Database error:', err);
+        if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+            handleDisconnect();
+        } else {
+            throw err;
+        }
+    });
+    return connection;
+}
+
+const connection = handleConnections()
+setInterval( async () => {
+    try{
+        console.log('Updating news database')
+        await updateNewsDB(connection)
+    } catch (err) {
+        console.log('Error updating news database:', err);
+    }
+}, 120000) //5400000)
 
 // use rate limiters on routes
 app.use('/api/',apiLimiter);
-app.use('/',mainLimiter);
+app.use('/getnews',mainLimiter);
 
 // use json for post requests
 app.use(express.json());
@@ -55,43 +81,60 @@ app.use(express.static(path.join(__dirname, 'dist')));
 
 // serve app
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    try {
+        res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    } catch (error) {
+        console.error(`Error in handler: ${error.message}`);
+        res.status(500).send("Internal Server Error");
     }
-);
+});
 
-// handle post requests
+// handle gpt requests
 app.post('/api/getCompletion', async (req, res) => {
     // run dbCycle to check for daily api calls and update database
-    updateNewsDB(connection);
-    if (rateLimitDBCycle(connection)) {
-        console.log('incoming request',req.body)
-        const prompt = req.body;
-        const response = await getChatCompletion(prompt,openAiInstance);
-        res.json(response);
-    } else {
-        console.log('Daily Global Request Limit Reached. Try Again Tomorrow.')
+    try {
+        const apiResults = await rateLimitDBCycle(connection)
+            if (apiResults) {
+                const prompt = req.body;
+                const response = await getChatCompletion(prompt,openAiInstance);
+                res.json(response);
+            } else {
+                res.json({response: ['Daily Global Request Limit Reached. Try Again Tomorrow.']})
+            }
+    } catch (error) {
+        console.error(`Error in handler: ${error.message}`);
+        res.status(500).send("Internal Server Error");
     }
 });
 
 // submit outline to gpt-3.5 to generate article
 app.post('/api/getArticle', async (req, res) => {
     // run dbCycle to check for daily api calls and update database
-    if (rateLimitDBCycle(connection)) {
-        console.log('incoming request',req.body)
-        const prompt = req.body;
-        const response = await getArticle(prompt,openAiInstance);
-        res.json(response);
-    } else {
-        console.log('Daily Global Request Limit Reached. Try Again Tomorrow.')
+    try {
+        const apiResults = await rateLimitDBCycle(connection)
+            if (apiResults) {
+                const prompt = req.body;
+                const response = await getArticle(prompt,openAiInstance);
+                res.json(response);
+            } else {
+                res.json({response: ['Daily Global Request Limit Reached. Try Again Tomorrow.']})
+            }
+
+    } catch (error) {
+        console.error(`Error in handler: ${error.message}`);
+        res.status(500).send("Internal Server Error");
     }
 });
 
 // get news stories from database
-// submit outline to gpt-3.5 to generate article
-app.post('/api/getNews', async (req, res) => {
-    // run dbCycle to check for daily api calls and update database
-        console.log('incoming request',req.body)
-
+app.get('/getNews', async (req, res) => {
+    try {
+        const results = await getAllStories(connection);
+        res.json(results);
+    } catch (error) {
+        console.error(`Error in handler: ${error.message}`);
+        res.status(500).send("Internal Server Error");
+    }
 });
 
 // start server
