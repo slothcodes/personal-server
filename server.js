@@ -42,7 +42,7 @@ function handleConnections() {
     connection.connect((err) => {
         if (err) {
             console.error('Error connecting to database:', err);
-            setTimeout(handleDisconnect, 5000);
+            setTimeout(handleConnections, 5000);
             return;
         }
         console.log('Connected to MySQL database');
@@ -51,7 +51,7 @@ function handleConnections() {
     connection.on('error', (err) => {
         console.error('Database error:', err);
         if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-            handleDisconnect();
+            handleConnections();
         } else {
             throw err;
         }
